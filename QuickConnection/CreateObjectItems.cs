@@ -4,6 +4,7 @@ using Grasshopper.Kernel.Types;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace QuickConnection;
 
@@ -24,7 +25,6 @@ internal class CreateObjectItems()
             {
                 inputPairSave[i] = new CreateObjectItem(inputPair.Value[i], true);
             }
-            InputItems[new Guid(inputPair.Key)] = inputPairSave;
         }
 
         OutputItems = [];

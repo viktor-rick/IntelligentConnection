@@ -91,7 +91,11 @@ public partial class ChooseWindow : Window
         _position = pivot;
         Guid guid = param.ComponentGuid;
 
-        SortedList<Guid, CreateObjectItem[]> dict = [];
+
+        //SortedList<Guid, CreateObjectItem[]> dict = [];
+
+        SortedList<Guid, CreateObjectItem[]> dict;
+
         if (isInput)
         {
             dict = SimpleAssemblyPriority.StaticCreateObjectItems.InputItems;
@@ -100,6 +104,11 @@ public partial class ChooseWindow : Window
         {
             dict = SimpleAssemblyPriority.StaticCreateObjectItems.OutputItems;
         }
+
+        dict[new Guid("825ea536-aebb-41e9-af32-8baeb2ecb590")] = [
+            new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 1, "a", false),
+            new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 2, "b", false)
+        ];
 
         //Change Guid.
         if (param is Param_ScriptVariable script)
@@ -128,6 +137,25 @@ public partial class ChooseWindow : Window
         };
         ObjectTitle.Header = objImage;
         ObjectList.ItemsSource = objItems;
+
+
+        // SMART CHOICES 
+        CreateObjectItem[] brainItems = [
+            new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 1, "Hey", false),
+            new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 2, "TEST", false)
+        ];
+        Image brainImage = CreateHeader(param.Icon_24x24);
+        BrainTitle.MouseDoubleClick += (sender, e) =>
+        {
+            Menu_EditItemLeftClicked(param.ComponentGuid, isInput);
+        };
+        BrainTitle.MouseRightButtonUp += (sender, e) =>
+        {
+            Menu_EditItemRightClicked(objItems, param.ComponentGuid, param, isInput);
+        };
+        BrainTitle.Header = brainImage;
+        BrainList.ItemsSource = brainItems;
+
 
         //Tree List Tree Quick Connect
         if (!isInput)
@@ -183,7 +211,7 @@ public partial class ChooseWindow : Window
             || guid == new Param_Line().ComponentGuid)
         {
             Param_Curve par = new Param_Curve();
-            Image image = CreateHeader(par.Icon_24x24);
+            Image image = CreateHeader(par. Icon_24x24);
             if (!dict.TryGetValue(par.ComponentGuid, out CreateObjectItem[] items)) items = [];
             CurveTitle.MouseDoubleClick += (sender, e) =>
             {
@@ -196,7 +224,8 @@ public partial class ChooseWindow : Window
             CurveTitle.Header = image;
             CurveList.ItemsSource = items;
         }
-        else CurveTitle.Visibility = Visibility.Collapsed;
+        //else CurveTitle.Visibility = Visibility.Collapsed;
+        
 
         //Brep
         if (guid == new Param_Surface().ComponentGuid || guid == new Guid("{89CD1A12-0007-4581-99BA-66578665E610}"))
