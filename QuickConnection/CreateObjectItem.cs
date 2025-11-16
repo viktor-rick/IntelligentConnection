@@ -1,6 +1,7 @@
 ﻿using Grasshopper.GUI.Canvas;
 using Grasshopper.Kernel;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
@@ -57,7 +58,25 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
 
         Icon = _proxy.Icon;
         Name = _proxy.Desc.Name;
-        ShowName = $"{_proxy.Desc.Name}[{index}]\n\nInitString: {init}\n\n" + _proxy.Desc.Description;
+        ShowName = $"{_proxy.Desc.Name}[{index}] - {_proxy.Desc.Description}";
+    }
+
+    public static void CreateMultiple(
+    IGH_Param owner,
+    PointF pos,
+    IEnumerable<CreateObjectItem> items)
+    {
+        float dx = 0;
+
+        foreach (var item in items)
+        {
+            // staggered placement
+            var dropPos = new PointF(pos.X + dx, pos.Y);
+            item.CreateObject(owner, dropPos);
+            dx += 30; // spacing between drops
+        }
+
+        Grasshopper.Instances.ActiveCanvas.Document.NewSolution(false);
     }
 
     public CreateObjectItem(CreateObjectItemSave save, bool isInput):this(save.ObjectGuid, save.Index, save.InitString, isInput)
