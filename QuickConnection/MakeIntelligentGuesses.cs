@@ -24,38 +24,49 @@ namespace QuickConnection;
 
 public static class DynamicCypherBuilder
 {
-    public static string BuildDynamicPattern(List<string> names)
+    public static string BuildDynamicPattern(List<string> names, List<string> targets, int outDepth)
     {
-        StringBuilder s = new StringBuilder();
-
-        s.Append("MATCH ");
+        // Example: for names = [ "Name_A", "Name_B", "Name_C" ]
+        // the generated query will be:
+        // MATCH (node0)-[r1]->(node1)-[r2]->(node2)
+        // WHERE node0.componentGuid = 'GUID_A' AND node1.componentGuid = 'GUID_B' AND node2.componentGuid = 'GUID_C'
+        // WITH node2
+        // MATCH (node2)-[rOut]->(next)
+        // RETURN next.componentName
+        StringBuilder patternBuilder = new StringBuilder();
+        patternBuilder.Append("MATCH ");
         for (int i = 0; i < names.Count; i++)
         {
             if (i > 0)
-                s.Append($"-[r{i}]->");
-
-            s.Append($"(node{i})");
+                patternBuilder.Append("-[r" + i + " {TargetName:'" + targets[i - 1] + "'}]->");
+            patternBuilder.Append($"(node{i})");
         }
-
-        s.Append("\nWHERE ");
+        patternBuilder.Append("\nWHERE ");
         for (int i = 0; i < names.Count; i++)
         {
-            s.Append($"node{i}.ComponentName = '{names[i]}'");
+            patternBuilder.Append($"node{i}.ComponentName = '{names[i]}'");
             if (i < names.Count - 1)
-                s.Append(" AND ");
+                patternBuilder.Append(" AND ");
         }
+        patternBuilder.Append($"\nWITH node{names.Count - 1}");
 
-        s.Append($"\nWITH node{names.Count - 1}");
-        s.Append($"\nMATCH (node{names.Count - 1})-[rOut]->(next)");
-        s.Append("\nRETURN DISTINCT next.ComponentGuid");
-
-        return s.ToString();
+        string matchOut = $"\nMATCH (node{names.Count - 1})";
+        string _return = $"\nRETURN DISTINCT node{names.Count - 1}";
+        for (int i = 0; i < outDepth; i++)
+        {
+            matchOut += $"-[rOut{i}]->(next{i})";
+            _return += $",rOut{i}, next{i}";
+        }
+        patternBuilder.Append(matchOut);
+        patternBuilder.Append(_return);
+        System.Console.WriteLine(patternBuilder);
+        return patternBuilder.ToString();
     }
 }
 
 public static class ComponentTraversal
 {
-    public static void TraverseUpstream(IGH_DocumentObject obj, IDriver driver, HashSet<Guid> visited, List<Guid> guesses, List<string> currentChain, int depth)
+    public static void TraverseUpstream(IGH_DocumentObject obj, IDriver driver, HashSet<Guid> visited, List<Guid> guesses, List<string> currentChain, List<string> currentTargets, int depth, int outDepth)
     {
         if (visited.Contains(obj.InstanceGuid))
             return;
@@ -73,10 +84,16 @@ public static class ComponentTraversal
                 };
                 newChain.AddRange(currentChain);
 
+                List<string> newTargets = new List<string>
+                {
+                    param.Name
+                };
+                newTargets.AddRange(currentTargets);
+
                 if (newChain.Count == depth)
                 {
                     // Build and store the dynamic query for the current chain.
-                    string query = DynamicCypherBuilder.BuildDynamicPattern(newChain);
+                    string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, outDepth);
 
                     // Run the query asynchronously and then block to get the result.
                     var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
@@ -95,7 +112,7 @@ public static class ComponentTraversal
                 else
                 {
                     // Continue traversing upstream.
-                    TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, depth);
+                    TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, newTargets, depth, outDepth);
                 }
             }
         }
@@ -112,9 +129,16 @@ public static class ComponentTraversal
                         upstreamObj.Name
                     };
                     newChain.AddRange(currentChain);
+
+                    List<string> newTargets = new List<string>
+                    {
+                        p.Name
+                    };
+                    newTargets.AddRange(currentTargets);
+
                     if (newChain.Count == depth)
                     {
-                        string query = DynamicCypherBuilder.BuildDynamicPattern(newChain);
+                        string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, outDepth);
 
                         // Run the query asynchronously and then block to get the result.
                         var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
@@ -132,14 +156,14 @@ public static class ComponentTraversal
                     }
                     else
                     {
-                        TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, depth);
+                        TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, newTargets, depth, outDepth);
                     }
                 }
             }
         }
     }
 
-    public static List<Guid> GetUpstreamResults(Guid guid, int depth, out List<Guid> visitedGuids)
+    public static List<Guid> GetUpstreamResults(Guid guid, int depth, int outDepth, out List<Guid> visitedGuids)
     {
         IGH_DocumentObject startObj = Instances.ActiveCanvas?.Document.FindObject(guid, false);
         if (startObj == null)
@@ -157,73 +181,10 @@ public static class ComponentTraversal
         HashSet<Guid> visited = new HashSet<Guid>();
         List<Guid> guesses = new List<Guid>();
         List<string> initialChain = new List<string> { startObj.Name };
-        TraverseUpstream(startObj, driver, visited, guesses, initialChain, depth);
+        List<string> initialTarget = new List<string>();
+        TraverseUpstream(startObj, driver, visited, guesses, initialChain, initialTarget, depth, outDepth);
         visitedGuids = visited.ToList();
         return guesses;
-    }
-}
-
-
-
-public class GHHelpers
-{
-    public static IGH_DocumentObject GetObjectByGuid(string guidStr)
-    {
-        var doc = Grasshopper.Instances.ActiveCanvas?.Document;
-        if (doc == null)
-        {
-            MessageBox.Show("Doc not found");
-            return null;
-        }
-
-        if (!Guid.TryParse(guidStr, out Guid guid))
-        {
-            MessageBox.Show("Input not a GUID");
-            return null;
-        }
-
-        return doc.FindObject(new Guid(guidStr), false);
-    }
-
-    public static List<Guid> RunQueries(List<string> queries)
-    {
-        IDriver driver = GraphDatabase.Driver(
-            "neo4j+s://916f7f37.databases.neo4j.io",
-            AuthTokens.Basic("neo4j", "_GjWi91K3QZkkGg3hA7Itrp-U9dlvzH80JnFsnvvW6I")
-        );
-        try
-        {
-            using (var session = driver.AsyncSession())
-            {
-                List<Guid> output = new List<Guid>();
-
-                foreach (var q in queries)
-                {
-                    var cypherQuery = q.Trim();
-                    var cursor = session.RunAsync(cypherQuery).GetAwaiter().GetResult();
-                    var records = cursor.ToListAsync().GetAwaiter().GetResult();
-                    foreach (var record in records)
-                    {
-                        if (record.Keys.Contains("next.ComponentGuid"))
-                        {
-                            output.Add(new Guid(record["next.ComponentGuid"].ToString()));
-                        }
-                    }
-                }
-
-                return output;
-            }
-        }
-        catch (Exception ex)
-        {
-            // Optionally, throw or return an empty list if there is an error
-            MessageBox.Show("Error: " + ex.Message);
-            return new List<Guid>();
-        }
-        finally
-        {
-            driver.Dispose();
-        }
     }
 }
 
@@ -440,10 +401,9 @@ public static class GuessFactory
     {
         // Retrieve the queries based on the OriginGUID
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
-        GHHelpers ghScript = new GHHelpers();
 
         // Get the Results from Neo4js
-        List<Guid> expected_components = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, out List<Guid> visited_guids);
+        List<Guid> expected_components = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, 2, out List<Guid> visited_guids);
 
         CreateObjectItem[] guesses = new CreateObjectItem[expected_components.Count];
         List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
