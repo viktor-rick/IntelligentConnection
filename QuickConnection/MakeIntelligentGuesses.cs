@@ -463,7 +463,10 @@ public static class GuessFactory
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
         var guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, 2, out List<Guid> visited_guids);
         //List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
         return guesses;
     }
 }

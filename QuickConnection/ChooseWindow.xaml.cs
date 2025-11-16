@@ -137,77 +137,76 @@ public partial class ChooseWindow : Window
 
 
         // SMART CHOICES 
-        //CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid);
-        CreateObjectItem[] brainItems =
-        {
-            new CreateObjectItem(
-            // -------------------------------------------------------------
-            // FIRST BRAIN ITEM
-            // -------------------------------------------------------------
-                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-                0, "", false)
-            {
-                InputParamName = "A", 
-                OutputParamName = "Volume", 
+        int trace = int.TryParse(IntA.Text, out var t) ? t : 2;
+        int predict = int.TryParse(IntB.Text, out var p) ? p : 2;
 
-                MultiItems = new[]
-                {
-                    new CreateObjectItem(
-                        new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-                        0, "", false)
-                    {
-                        InputParamName = "A",
-                        OutputParamName = "Result"
-                    },
+        CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid, trace, predict);
+        //CreateObjectItem[] brainItems =
+        //{
+        //    new CreateObjectItem(
+        //    // -------------------------------------------------------------
+        //    // FIRST BRAIN ITEM
+        //    // -------------------------------------------------------------
+        //    new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+        //    0, "", false)
+        //    {
 
-                    new CreateObjectItem(
-                        new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-                        0, "", false)
-                    {
-                        InputParamName = "B",
-                        OutputParamName = "Result"
-                    },
+        //        MultiItems = new[]
+        //        {
+        //            new CreateObjectItem(
+        //                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+        //                0, "", false)
+        //            {
+        //                InputParamName = "A",
+        //                OutputParamName = "Result"
+        //            },
 
-                    new CreateObjectItem(
-                        new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
-                        0, "", false)
-                    {
-                        InputParamName = "B",
-                        OutputParamName = "Result"
-                    }
-                }
-            },
+        //            new CreateObjectItem(
+        //                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+        //                0, "", false)
+        //            {
+        //                InputParamName = "B",
+        //                OutputParamName = "Result"
+        //            },
 
-            // -------------------------------------------------------------
-            // SECOND BRAIN ITEM
-            // -------------------------------------------------------------
-            new CreateObjectItem(
-                new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
-                0, "", false)
-            {
-                InputParamName = "Area",
-                OutputParamName = "B",
+        //            new CreateObjectItem(
+        //                new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
+        //                0, "", false)
+        //            {
+        //                InputParamName = "B",
+        //                OutputParamName = "Result"
+        //            }
+        //        }
+        //    },
 
-                MultiItems = new[]
-                {
-                    new CreateObjectItem(
-                        new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-                        0, "", false)
-                    {
-                        InputParamName = "A",
-                        OutputParamName = "Result"
-                    },
+        //    // -------------------------------------------------------------
+        //    // SECOND BRAIN ITEM
+        //    // -------------------------------------------------------------
+        //    new CreateObjectItem(
+        //        new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
+        //        0, "", false)
+        //    {
 
-                    new CreateObjectItem(
-                        new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
-                        0, "", false)
-                    {
-                        InputParamName = "B",
-                        OutputParamName = "Result"
-                    }
-                }
-            }
-        };
+        //        MultiItems = new[]
+        //        {
+        //            new CreateObjectItem(
+        //                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+        //                0, "", false)
+        //            {
+        //                InputParamName = "A",
+        //                OutputParamName = "Result"
+        //            },
+
+        //            new CreateObjectItem(
+        //                new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
+        //                0, "", false)
+        //            {
+        //                InputParamName = "B",
+        //                OutputParamName = "Result"
+        //            }
+        //        }
+        //    }
+        //};
         var uri = new Uri("pack://application:,,,/QuickConnection;component/Resources/brain.png", UriKind.Absolute);
 
         Image brainImage = new Image
