@@ -534,7 +534,10 @@ public static class GuessFactory
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
 
         CreateObjectItem[] guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, trace, predict, out List<Guid> visited_guids);
-        List<string> generated_names = LLMHelper.GenerateBatchText("", guesses, visited_guids);
+
+        string API_KEY = "";
+
+        List<string> generated_names = LLMHelper.GenerateBatchText(API_KEY, guesses, visited_guids);
 
         foreach(CreateObjectItem guess in guesses)
         {
