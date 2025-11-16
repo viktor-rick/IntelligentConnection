@@ -258,15 +258,16 @@ public class LLMNamePredictor
 {
     public List<string> GenerateBatchText(
     string apiKey,
-    List<Guid> expectedGuids,
+    CreateObjectItem[] expectedItems,
     List<Guid> visitedGuids)
     {
         var doc = Grasshopper.Instances.ActiveCanvas?.Document;
 
         var batchGroups = new List<object>();
 
-        foreach (Guid expectedGuid in expectedGuids)
+        foreach (CreateObjectItem expectedItem in expectedItems)
         {
+            Guid expectedGuid = expectedItem.ObjectGuid;
             // Build the per-item list: visited + expected
             List<Guid> newList = new List<Guid>(visitedGuids);
             newList.Add(expectedGuid);
@@ -397,7 +398,7 @@ public class LLMNamePredictor
             "{" +
             "\"model\":\"gpt-4.1-mini\"," +
             "\"messages\":[" +
-            "{\"role\":\"system\",\"content\":\"You will receive multiple component-groups. For each group, generate exactly one 8–15 word engaging, motivating, but real and technical description. Return ONLY: { \\\"names\\\": [..] } where order matches the input groups.\"}," +
+            "{\"role\":\"system\",\"content\":\"You will receive multiple component-groups. For each group, generate exactly one 8–15 word engaging, but technical description. Return ONLY: { \\\"names\\\": [..] } where order matches the input groups.\"}," +
             "{\"role\":\"user\",\"content\":\"" + Escape(batchJson) + "\"}" +
             "]" +
             "}";
@@ -466,9 +467,18 @@ public static class GuessFactory
     {
         // Retrieve the queries based on the OriginGUID
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
-        var guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, trace, predict, out List<Guid> visited_guids);
-        //List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
+        CreateObjectItem[] guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, trace, predict, out List<Guid> visited_guids);
+        List<string> generated_names = LLMHelper.GenerateBatchText("", guesses, visited_guids);
 
+        foreach(CreateObjectItem guess in guesses)
+        {
+            int index = Array.IndexOf(guesses, guess);
+            if (index >= 0 && index < generated_names.Count)
+            {
+                string generated_name = generated_names[index];
+                guess.InitString = generated_name;
+            }
+        }
         return guesses;
     }
 }

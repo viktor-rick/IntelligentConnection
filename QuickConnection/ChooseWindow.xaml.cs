@@ -141,72 +141,7 @@ public partial class ChooseWindow : Window
         int predict = int.TryParse(IntB.Text, out var p) ? p : 2;
 
         CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid, trace, predict);
-        //CreateObjectItem[] brainItems =
-        //{
-        //    new CreateObjectItem(
-        //    // -------------------------------------------------------------
-        //    // FIRST BRAIN ITEM
-        //    // -------------------------------------------------------------
-        //    new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-        //    0, "", false)
-        //    {
-
-        //        MultiItems = new[]
-        //        {
-        //            new CreateObjectItem(
-        //                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-        //                0, "", false)
-        //            {
-        //                InputParamName = "A",
-        //                OutputParamName = "Result"
-        //            },
-
-        //            new CreateObjectItem(
-        //                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-        //                0, "", false)
-        //            {
-        //                InputParamName = "B",
-        //                OutputParamName = "Result"
-        //            },
-
-        //            new CreateObjectItem(
-        //                new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
-        //                0, "", false)
-        //            {
-        //                InputParamName = "B",
-        //                OutputParamName = "Result"
-        //            }
-        //        }
-        //    },
-
-        //    // -------------------------------------------------------------
-        //    // SECOND BRAIN ITEM
-        //    // -------------------------------------------------------------
-        //    new CreateObjectItem(
-        //        new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
-        //        0, "", false)
-        //    {
-
-        //        MultiItems = new[]
-        //        {
-        //            new CreateObjectItem(
-        //                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
-        //                0, "", false)
-        //            {
-        //                InputParamName = "A",
-        //                OutputParamName = "Result"
-        //            },
-
-        //            new CreateObjectItem(
-        //                new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
-        //                0, "", false)
-        //            {
-        //                InputParamName = "B",
-        //                OutputParamName = "Result"
-        //            }
-        //        }
-        //    }
-        //};
+        
         var uri = new Uri("pack://application:,,,/QuickConnection;component/Resources/brain.png", UriKind.Absolute);
 
         Image brainImage = new Image
