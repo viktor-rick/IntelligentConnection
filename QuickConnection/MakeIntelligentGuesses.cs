@@ -171,6 +171,8 @@ public static class ComponentTraversal
 
                     if (depth == 1 || newChain.Count == depth)
                     {
+                        if (!visited.Contains(upstreamObj.InstanceGuid)) visited.Add(upstreamObj.InstanceGuid);
+
                         string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, depth, outDepth);
 
                         // Run the query asynchronously and then block to get the result.
