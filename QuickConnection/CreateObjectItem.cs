@@ -23,6 +23,7 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
     private readonly IGH_ObjectProxy _proxy;
 
     private readonly bool isCoreLibrary = false;
+    public CreateObjectItem[] MultiItems { get; set; } = null;
 
     public CreateObjectItem(Guid guid, ushort index, string init, bool isInput)
     {
@@ -64,16 +65,33 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
     public static void CreateMultiple(
     IGH_Param owner,
     PointF pos,
-    IEnumerable<CreateObjectItem> items)
+    CreateObjectItem[] items)
     {
+        if (items == null || items.Length == 0)
+            return;
+
+        IGH_Param currentInput = owner;
         float dx = 0;
 
         foreach (var item in items)
         {
-            // staggered placement
             var dropPos = new PointF(pos.X + dx, pos.Y);
-            item.CreateObject(owner, dropPos);
-            dx += 30; // spacing between drops
+
+            IGH_DocumentObject newObj =
+                item.CreateObject(currentInput, dropPos);
+
+            if (newObj is IGH_Component comp)
+            {
+                // next item will connect to this component’s output
+                currentInput = comp.Params.Output[item.Index];
+            }
+            else if (newObj is IGH_Param par)
+            {
+                // next item will connect to this param's output grip
+                currentInput = par;
+            }
+
+            dx += 110; // spacing for display
         }
 
         Grasshopper.Instances.ActiveCanvas.Document.NewSolution(false);

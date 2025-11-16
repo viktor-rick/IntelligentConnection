@@ -137,7 +137,28 @@ public partial class ChooseWindow : Window
 
 
         // SMART CHOICES 
-        CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid);
+        //CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid);
+        CreateObjectItem[] brainItems =
+        {
+            new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false)
+            {
+                MultiItems = new[]
+                {
+                    new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false),
+                    new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false),
+                    new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 0, "", false)
+                }
+            },
+
+            new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 0, "", false)
+            {
+                MultiItems = new[]
+                {
+                    new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false),
+                    new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 0, "", false)
+                }
+            }
+        };
         var uri = new Uri("pack://application:,,,/QuickConnection;component/Resources/brain.png", UriKind.Absolute);
 
         Image brainImage = new Image
@@ -373,10 +394,17 @@ public partial class ChooseWindow : Window
         if (sender is not ListBox listBox) return;
 
         CreateObjectItem cItem = (CreateObjectItem)listBox.SelectedItem;
-
         if (cItem == null) return;
 
-        Instances.ActiveCanvas.ActiveInteraction = null;
+        // MULTI-DROP SUPPORT
+        if (cItem.MultiItems != null && cItem.MultiItems.Length > 0)
+        {
+            CreateObjectItem.CreateMultiple(_owner, _position, cItem.MultiItems);
+            Close();
+            return;
+        }
+
+        // DEFAULT BEHAVIOR FOR EVERYTHING ELSE
         cItem.CreateObject(_owner, _position);
         this.Close();
     }
