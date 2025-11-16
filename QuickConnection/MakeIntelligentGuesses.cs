@@ -1,8 +1,11 @@
-﻿using Grasshopper;
+﻿using GH_IO.Serialization;
+using Grasshopper;
 using Grasshopper.GUI.Canvas;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Neo4j.Driver;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Rhino;
 using System;
 using System.Collections.Generic;
@@ -227,127 +230,84 @@ public class GHHelpers
 
 public class LLMNamePredictor
 {
-    public string GenerateText(string ApiKey, List<string> AllNames)
+    public List<string> GenerateBatchText(
+    string apiKey,
+    List<Guid> expectedGuids,
+    List<Guid> visitedGuids)
     {
-        //var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+        var doc = Grasshopper.Instances.ActiveCanvas?.Document;
 
-        //List<Node> nodes = new List<Node>();
-        //List<Edge> edges = new List<Edge>();
+        var batchGroups = new List<object>();
 
-        ////// ---------------------------------------
-        ////// Collect nodes
-        ////// ---------------------------------------
-        ////if (doc != null)
-        ////{
-        ////    List<GH_Component> comps = new List<GH_Component>();
-
-
-        //foreach (IGH_DocumentObject obj in doc.Objects)
-        //{
-        //    GH_Component comp = obj as GH_Component;
-        //    if (comp == null) continue;
-        //    if (!comp.Attributes.Selected) continue;
-
-        //    comps.Add(comp);
-        //}
-
-        //Dictionary<GH_Component, string> map = new Dictionary<GH_Component, string>();
-
-        //foreach (GH_Component c in comps)
-        //{
-        //    string id = c.InstanceGuid.ToString();
-        //    map[c] = id;
-
-        //    nodes.Add(new Node
-        //    {
-        //        id = id,
-        //        name = c.Name,
-        //        nickname = c.NickName,
-        //        type = c.GetType().FullName
-        //    });
-        //}
-
-        //// ---------------------------------------
-        //// Collect edges
-        //// ---------------------------------------
-        //foreach (GH_Component target in comps)
-        //{
-        //    string targetId = map[target];
-
-        //    foreach (IGH_Param input in target.Params.Input)
-        //    {
-        //        foreach (IGH_Param src in input.Sources)
-        //        {
-        //            if (src == null || src.Attributes == null) continue;
-
-        //            var top = src.Attributes.GetTopLevel;
-        //            if (top == null) continue;
-
-        //            GH_Component fromC = top.DocObject as GH_Component;
-        //            if (fromC == null) continue;
-        //            if (fromC.InstanceGuid == this.Component.InstanceGuid) continue;
-
-        //            string fromId;
-        //            if (!map.TryGetValue(fromC, out fromId)) continue;
-
-        //            edges.Add(new Edge
-        //            {
-        //                from = fromId,
-        //                to = targetId,
-        //                from_name = fromC.NickName,
-        //                to_name = target.NickName
-        //            });
-        //        }
-        //    }
-        //}
-
-
-        // Output lists
-        //NODES = nodes;
-        //EDGES = edges;
-
-        // ---------------------------------------
-        // MANUAL JSON SERIALIZATION
-        // ---------------------------------------
-        //string json = BuildJson(nodes, edges);
-
-
-        // ---------------------------------------
-        // TEMP
-        // ---------------------------------------
-
-        StringBuilder sb = new StringBuilder();
-
-        sb.Append("{\"nodes\":[");
-        for (int i = 0; i < AllNames.Count; i++)
+        foreach (Guid expectedGuid in expectedGuids)
         {
-            var name = AllNames[i];
-            sb.Append("{");
-            sb.AppendFormat("\"id\":\"{0}\",", Escape(i.ToString()));
-            sb.AppendFormat("\"name\":\"{0}\",", Escape(name));
-            sb.AppendFormat("\"nickname\":\"{0}\",", Escape(name));
-            sb.AppendFormat("\"type\":\"{0}\"", Escape("Grasshopper.Kernel.Parameters.Param_GenericObject"));
-            sb.Append("}");
-            if (i < AllNames.Count - 1) sb.Append(",");
-        }
-        string json = sb.ToString();
+            // Build the per-item list: visited + expected
+            List<Guid> newList = new List<Guid>(visitedGuids);
+            newList.Add(expectedGuid);
 
-        // ---------------------------------------
-        // ChatGPT call
-        // ---------------------------------------
+            // Convert GUID list → nodes
+            List<Node> nodes = new List<Node>();
+            foreach (Guid g in newList)
+            {
+                var obj = doc?.FindObject(g, false);
+                if (obj == null)
+                {
+                    var proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(g);
+                    nodes.Add(new Node
+                    {
+                        id = proxy?.Guid ?? g,
+                        name = proxy?.Desc.Name ?? "Missing",
+                        nickname = proxy?.Desc.NickName ?? "",
+                        type = proxy?.Desc.Name ?? "Unknown"
+                    });
+                }
+                else
+                {
+                    nodes.Add(new Node
+                    {
+                        id = obj.InstanceGuid,
+                        name = obj.Name,
+                        nickname = obj.NickName,
+                        type = obj.GetType().FullName
+                    });
+                }
+            }
 
-        if (string.IsNullOrWhiteSpace(ApiKey))
-        {
-            MessageBox.Show("Please provide an API key");
+            batchGroups.Add(new
+            {
+                id = expectedGuid.ToString(),
+                components = nodes
+            });
         }
 
-        string response = CallChatGPT(json, ApiKey);
-        return response;
+        // Build JSON for the whole batch
+        string batchJson = JsonConvert.SerializeObject(new
+        {
+            groups = batchGroups
+        });
+
+        // Single ChatGPT call
+        string response = CallChatGPTBatch(batchJson, apiKey);
+
+        // Parse result: { "names": [ "...", "...", ... ] }
+        JObject raw = JObject.Parse(response);
+
+        // STEP 1: get message.content
+        string contentJson = raw["choices"]?[0]?["message"]?["content"]?.ToString();
+
+        if (string.IsNullOrWhiteSpace(contentJson))
+            throw new Exception("GPT response did not contain message.content");
+
+        // STEP 2: parse content JSON (this contains {"names":[...]})
+        JObject content = JObject.Parse(contentJson);
+
+        // STEP 3: extract the names array
+        return content["names"].ToObject<List<string>>();
     }
 
     public class Node
     {
-        public string id;
+        public Guid id;
         public string name;
         public string nickname;
         public string type;
@@ -377,7 +337,7 @@ public class LLMNamePredictor
         {
             var n = nodes[i];
             sb.Append("{");
-            sb.AppendFormat("\"id\":\"{0}\",", Escape(n.id));
+            sb.AppendFormat("\"id\":\"{0}\",", Escape(n.id.ToString()));
             sb.AppendFormat("\"name\":\"{0}\",", Escape(n.name));
             sb.AppendFormat("\"nickname\":\"{0}\",", Escape(n.nickname));
             sb.AppendFormat("\"type\":\"{0}\"", Escape(n.type));
@@ -403,7 +363,7 @@ public class LLMNamePredictor
         return sb.ToString();
     }
 
-    string CallChatGPT(string graphJson, string apiKey)
+    string CallChatGPTBatch(string batchJson, string apiKey)
     {
         string url = "https://api.openai.com/v1/chat/completions";
 
@@ -411,8 +371,8 @@ public class LLMNamePredictor
             "{" +
             "\"model\":\"gpt-4.1-mini\"," +
             "\"messages\":[" +
-            "{\"role\":\"system\",\"content\":\"You are a helpful assistant for Grasshopper in Rhino. You will get a json format grasshopper file component data - output a very brief just a single line only 5 to 12 words on what it does.\"}," +
-            "{\"role\":\"user\",\"content\":\"" + Escape(graphJson) + "\"}" +
+            "{\"role\":\"system\",\"content\":\"You will receive multiple component-groups. For each group, generate exactly one 5–12 word engaging and motivating description. Return ONLY: { \\\"names\\\": [..] } where order matches the input groups.\"}," +
+            "{\"role\":\"user\",\"content\":\"" + Escape(batchJson) + "\"}" +
             "]" +
             "}";
 
@@ -427,23 +387,14 @@ public class LLMNamePredictor
             using (var stream = req.GetRequestStream())
                 stream.Write(body, 0, body.Length);
 
-            using (var resp = (HttpWebResponse)req.GetResponse())
+            using (var resp = req.GetResponse())
             using (var reader = new StreamReader(resp.GetResponseStream()))
-            {
-                string raw = reader.ReadToEnd();
-
-                // ------------------------------------
-                // Extract choices[0].message.content
-                // ------------------------------------
-                string content = ExtractContentFromResponse(raw);
-                return content ?? raw; // fallback to raw if parsing fails
-            }
+                return reader.ReadToEnd();
         }
         catch (Exception ex)
         {
-            return "Error: " + ex.Message;
+            return "{\"names\":[\"Error: " + ex.Message + "\"]}";
         }
-
     }
 
     // <Custom additional code> 
@@ -494,15 +445,8 @@ public static class GuessFactory
         // Get the Results from Neo4js
         List<Guid> expected_components = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, out List<Guid> visited_guids);
 
-        // Get the names of the visited components
-        List<string> names = new List<string>();
-        foreach (Guid v in visited_guids)
-        {
-            IGH_DocumentObject original_component = GHHelpers.GetObjectByGuid(v.ToString());
-            names.Add(original_component.Name);
-        }
-
         CreateObjectItem[] guesses = new CreateObjectItem[expected_components.Count];
+        List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
         ushort i = 0;
         foreach (Guid expected_guid in expected_components)
         {
@@ -514,12 +458,10 @@ public static class GuessFactory
             }
             else
             {
-                List<string> newList = new List<string>(names);
-                newList.Add(_proxy.Desc.Name);
+                List<Guid> newList = new List<Guid>(visited_guids);
+                newList.Add(expected_guid);
 
-                string generated_name = LLMHelper.GenerateText("", newList);
-
-                guesses[i] = new CreateObjectItem(expected_guid, 0, generated_name, false);
+                guesses[i] = new CreateObjectItem(expected_guid, 0, generated_names[i], false);
             }
             i++;
         }

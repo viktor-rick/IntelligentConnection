@@ -46,7 +46,7 @@
                         <Image Source="{Binding Icon, Converter={StaticResource BitmapConverter}}"
                            Width="24" Height="24"
                            Margin="1,1,1,1"
-                           ToolTip="{Binding ShowName}"/>
+                           ToolTip="{Binding InitString}"/>
                     </DataTemplate>
                 </Setter.Value>
             </Setter>
@@ -73,8 +73,10 @@
                                        Width="24" Height="24"
                                        Margin="0,0,5,0"
                                        DockPanel.Dock="Left"/>
-                                    <TextBlock Text="{Binding ShowName}"
-                                           VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding InitString}"
+                                       VerticalAlignment="Center"
+                                       FontStyle="Italic"
+                                       Foreground="#444"/>          
                                 </DockPanel>
                             </DataTemplate>
                         </Setter.Value>
