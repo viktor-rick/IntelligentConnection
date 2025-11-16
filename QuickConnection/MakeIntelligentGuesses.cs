@@ -42,14 +42,19 @@ public static class DynamicCypherBuilder
                 patternBuilder.Append("-[r" + i + " {TargetName:'" + targets[i - 1] + "'}]->");
             patternBuilder.Append($"(node{i})");
         }
-        patternBuilder.Append("\nWHERE ");
+        
+        string whereString = "";
         for (int i = 0; i < names.Count; i++)
         {
-            if(i == 0 && depth == 1) patternBuilder.Append($"node{i}");
-            else patternBuilder.Append($"node{i}.ComponentName = '{names[i]}'");
+            if(i == 0 && depth == 1) {}
+            else whereString+=$"node{i}.ComponentName = '{names[i]}'";
 
             if (i < names.Count - 1)
-                patternBuilder.Append(" AND ");
+                whereString+=" AND ";
+        }
+        if (whereString.Length > 0) {
+            patternBuilder.Append("\nWHERE ");
+            patternBuilder.Append(whereString);
         }
         patternBuilder.Append($"\nWITH node{names.Count - 1}");
 
@@ -94,6 +99,8 @@ public static class ComponentTraversal
 
                 if (depth == 1 || newChain.Count == depth)
                 {
+                    if (!visited.Contains(upstreamObj.InstanceGuid)) visited.Add(upstreamObj.InstanceGuid);
+
                     // Build and store the dynamic query for the current chain.
                     string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, depth, outDepth);
 
@@ -154,75 +161,133 @@ public static class ComponentTraversal
         {
             foreach (IGH_Param p in comp.Params.Input)
             {
-                foreach (IGH_Param source in p.Sources)
+                if (p.SourceCount == 0)
                 {
-                    IGH_DocumentObject upstreamObj = source.Attributes.GetTopLevel.DocObject;
-                    List<string> newChain = new List<string>
+                    string query = DynamicCypherBuilder.BuildDynamicPattern(currentChain, currentTargets, currentChain.Count, outDepth);
+                    // Run the query asynchronously and then block to get the result.
+                    var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
+
+                    // Retrieve all records returned by this query.
+                    var records = cursor.ToListAsync().GetAwaiter().GetResult();
+
+                    if (records.Count > 0)
+                    {
+                        foreach (var record in records)
+                        {
+                            // Get the component from the GUID to test if it exists
+                            if (!record.ContainsKey("next0.ComponentGuid")) continue;
+                            Guid expected_guid = new Guid(record["next0.ComponentGuid"].ToString());
+                            var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
+                            if (_proxy == null) continue;
+
+                            var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
+                            newGuess.InputParamName = record["rOut0.TargetName"].ToString();
+
+                            var multiItems = new List<CreateObjectItem>() { newGuess };
+
+                            bool allComponentsExist = true;
+                            for (int i = 1; i < depth; i++)
+                            {
+                                if (!record.ContainsKey($"next{i}.ComponentGuid"))
+                                {
+                                    allComponentsExist = false;
+                                    break;
+                                }
+
+                                Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
+
+                                var _next_proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(next_expected_guid);
+                                if (_next_proxy == null)
+                                {
+                                    allComponentsExist = false;
+                                    break;
+                                }
+
+                                var nextGuess = new CreateObjectItem(next_expected_guid, 0, "", false);
+                                nextGuess.InputParamName = record[$"rOut{i}.TargetName"].ToString();
+                                nextGuess.OutputParamName = record[$"rOut{i}.SourceName"].ToString();
+                                multiItems.Add(nextGuess);
+                            }
+
+                            if (!allComponentsExist) continue;
+
+                            newGuess.MultiItems = multiItems.ToArray();
+                            guesses.Add(newGuess);
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (IGH_Param source in p.Sources)
+                    {
+                        IGH_DocumentObject upstreamObj = source.Attributes.GetTopLevel.DocObject;
+                        List<string> newChain = new List<string>
                     {
                         upstreamObj.Name
                     };
-                    newChain.AddRange(currentChain);
+                        newChain.AddRange(currentChain);
 
-                    List<string> newTargets = new List<string>
+                        List<string> newTargets = new List<string>
                     {
                         p.Name
                     };
-                    newTargets.AddRange(currentTargets);
+                        newTargets.AddRange(currentTargets);
 
-                    if (depth == 1 || newChain.Count == depth)
-                    {
-                        if (!visited.Contains(upstreamObj.InstanceGuid)) visited.Add(upstreamObj.InstanceGuid);
-
-                        string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, depth, outDepth);
-
-                        // Run the query asynchronously and then block to get the result.
-                        var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
-
-                        // Retrieve all records returned by this query.
-                        var records = cursor.ToListAsync().GetAwaiter().GetResult();
-
-                        if (records.Count > 0)
+                        if (depth == 1 || newChain.Count == depth)
                         {
-                            foreach (var record in records)
+                            if (!visited.Contains(upstreamObj.InstanceGuid)) visited.Add(upstreamObj.InstanceGuid);
+
+                            string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, depth, outDepth);
+
+                            // Run the query asynchronously and then block to get the result.
+                            var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
+
+                            // Retrieve all records returned by this query.
+                            var records = cursor.ToListAsync().GetAwaiter().GetResult();
+
+                            if (records.Count > 0)
                             {
-                                // Get the component from the GUID to test if it exists
-                                Guid expected_guid = new Guid(record["next0.ComponentGuid"].ToString());
-                                var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
-                                if (_proxy == null) continue;
-
-                                var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
-                                newGuess.InputParamName = record["rOut0.TargetName"].ToString();
-
-                                var multiItems = new List<CreateObjectItem>() { newGuess };
-
-                                bool allComponentsExist = true;
-                                for (int i = 1; i < depth; i++)
+                                foreach (var record in records)
                                 {
-                                    Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
+                                    // Get the component from the GUID to test if it exists
+                                    Guid expected_guid = new Guid(record["next0.ComponentGuid"].ToString());
+                                    var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
+                                    if (_proxy == null) continue;
 
-                                    var _next_proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(next_expected_guid);
-                                    if (_next_proxy == null)
+                                    var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
+                                    newGuess.InputParamName = record["rOut0.TargetName"].ToString();
+
+                                    var multiItems = new List<CreateObjectItem>() { newGuess };
+
+                                    bool allComponentsExist = true;
+                                    for (int i = 1; i < depth; i++)
                                     {
-                                        allComponentsExist = false;
-                                        break;
+                                        Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
+
+                                        var _next_proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(next_expected_guid);
+                                        if (_next_proxy == null)
+                                        {
+                                            allComponentsExist = false;
+                                            break;
+                                        }
+
+                                        var nextGuess = new CreateObjectItem(next_expected_guid, 0, "", false);
+                                        nextGuess.InputParamName = record[$"rOut{i}.TargetName"].ToString();
+                                        nextGuess.OutputParamName = record[$"rOut{i}.SourceName"].ToString();
+                                        multiItems.Add(nextGuess);
                                     }
 
-                                    var nextGuess = new CreateObjectItem(next_expected_guid, 0, "", false);
-                                    nextGuess.InputParamName = record[$"rOut{i}.TargetName"].ToString();
-                                    nextGuess.OutputParamName = record[$"rOut{i}.SourceName"].ToString();
-                                    multiItems.Add(nextGuess);
+                                    if (!allComponentsExist) continue;
+
+                                    newGuess.MultiItems = multiItems.ToArray();
+                                    guesses.Add(newGuess);
                                 }
-
-                                if (!allComponentsExist) continue;
-
-                                newGuess.MultiItems = multiItems.ToArray();
-                                guesses.Add(newGuess);
                             }
                         }
-                    }
-                    else
-                    {
-                        TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, newTargets, depth, outDepth);
+                        else
+                        {
+                            TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, newTargets, depth, outDepth);
+                        }
                     }
                 }
             }
