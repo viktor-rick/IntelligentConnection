@@ -15,10 +15,31 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="Grasshopper" Version="8.25.25314.11001" />
+    <PackageReference Include="Grasshopper" Version="8.14.24345.15001" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="SimpleGrasshopper" Version="1.8.6" />
 	  <EmbeddedResource Include="Resources\*.png" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Remove="Resources\brain.png" />
+    <EmbeddedResource Remove="Resources\QuickwireIcon_128.png" />
+    <EmbeddedResource Remove="Resources\QuickwireIcon_24.png" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Remove="Resources\quickwires.txt" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Resource Include="Resources\QuickwireIcon_24.png" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Resource Include="Resources\brain.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\QuickwireIcon_128.png" />
   </ItemGroup>
   
   <ItemGroup>

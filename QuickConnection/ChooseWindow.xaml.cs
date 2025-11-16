@@ -15,6 +15,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using Image = System.Windows.Controls.Image;
 
 namespace QuickConnection;
@@ -144,7 +145,16 @@ public partial class ChooseWindow : Window
             new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 1, "Hey", false),
             new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 2, "TEST", false)
         ];
-        Image brainImage = CreateHeader(param.Icon_24x24);
+        var uri = new Uri("pack://application:,,,/QuickConnection;component/Resources/brain.png", UriKind.Absolute);
+
+        Image brainImage = new Image
+        {
+            Source = new BitmapImage(uri),
+            Width = 16,
+            Height = 16,
+            ToolTip = "Smart Suggestions"
+        };
+        BrainTitle.Header = brainImage;
         BrainTitle.MouseDoubleClick += (sender, e) =>
         {
             Menu_EditItemLeftClicked(param.ComponentGuid, isInput);
@@ -155,7 +165,6 @@ public partial class ChooseWindow : Window
         };
         BrainTitle.Header = brainImage;
         BrainList.ItemsSource = brainItems;
-
 
         //Tree List Tree Quick Connect
         if (!isInput)
@@ -224,7 +233,7 @@ public partial class ChooseWindow : Window
             CurveTitle.Header = image;
             CurveList.ItemsSource = items;
         }
-        //else CurveTitle.Visibility = Visibility.Collapsed;
+        else CurveTitle.Visibility = Visibility.Collapsed;
         
 
         //Brep
