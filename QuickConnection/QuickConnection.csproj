@@ -15,7 +15,8 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="Grasshopper" Version="8.14.24345.15001" />
+    <PackageReference Include="Grasshopper" Version="8.25.25314.11001" />
+    <PackageReference Include="Neo4j.Driver" Version="5.28.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="SimpleGrasshopper" Version="1.8.6" />
 	  <EmbeddedResource Include="Resources\*.png" />

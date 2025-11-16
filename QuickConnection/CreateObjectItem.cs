@@ -23,6 +23,7 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
     private readonly IGH_ObjectProxy _proxy;
 
     private readonly bool isCoreLibrary = false;
+
     public CreateObjectItem(Guid guid, ushort index, string init, bool isInput)
     {
         ObjectGuid = guid;

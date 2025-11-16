@@ -91,6 +91,7 @@ public partial class ChooseWindow : Window
         _owner = param;
         _position = pivot;
         Guid guid = param.ComponentGuid;
+        Guid componentguid = param.Attributes.GetTopLevel.DocObject.InstanceGuid;
 
 
         //SortedList<Guid, CreateObjectItem[]> dict = [];
@@ -105,11 +106,6 @@ public partial class ChooseWindow : Window
         {
             dict = SimpleAssemblyPriority.StaticCreateObjectItems.OutputItems;
         }
-
-        dict[new Guid("825ea536-aebb-41e9-af32-8baeb2ecb590")] = [
-            new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 1, "a", false),
-            new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 2, "b", false)
-        ];
 
         //Change Guid.
         if (param is Param_ScriptVariable script)
@@ -141,10 +137,7 @@ public partial class ChooseWindow : Window
 
 
         // SMART CHOICES 
-        CreateObjectItem[] brainItems = [
-            new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 1, "Hey", false),
-            new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 2, "TEST", false)
-        ];
+        CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid);
         var uri = new Uri("pack://application:,,,/QuickConnection;component/Resources/brain.png", UriKind.Absolute);
 
         Image brainImage = new Image
