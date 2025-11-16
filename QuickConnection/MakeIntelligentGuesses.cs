@@ -51,22 +51,21 @@ public static class DynamicCypherBuilder
         patternBuilder.Append($"\nWITH node{names.Count - 1}");
 
         string matchOut = $"\nMATCH (node{names.Count - 1})";
-        string _return = $"\nRETURN DISTINCT node{names.Count - 1}";
+        string _return = $"\nRETURN DISTINCT node{names.Count - 1}.ComponentGuid";
         for (int i = 0; i < outDepth; i++)
         {
             matchOut += $"-[rOut{i}]->(next{i})";
-            _return += $",rOut{i}, next{i}";
+            _return += $",rOut{i}.SourceName,rOut{i}.TargetName, next{i}.ComponentGuid";
         }
         patternBuilder.Append(matchOut);
         patternBuilder.Append(_return);
-        System.Console.WriteLine(patternBuilder);
         return patternBuilder.ToString();
     }
 }
 
 public static class ComponentTraversal
 {
-    public static void TraverseUpstream(IGH_DocumentObject obj, IDriver driver, HashSet<Guid> visited, List<Guid> guesses, List<string> currentChain, List<string> currentTargets, int depth, int outDepth)
+    public static void TraverseUpstream(IGH_DocumentObject obj, IDriver driver, HashSet<Guid> visited, List<CreateObjectItem> guesses, List<string> currentChain, List<string> currentTargets, int depth, int outDepth)
     {
         if (visited.Contains(obj.InstanceGuid))
             return;
@@ -105,7 +104,38 @@ public static class ComponentTraversal
                     {
                         foreach (var record in records)
                         {
-                            guesses.Add(new Guid(record["next.ComponentGuid"].ToString()));
+                            // Get the component from the GUID to test if it exists
+                            Guid expected_guid = new Guid(record["next0.ComponentGuid"].ToString());
+                            var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
+                            if (_proxy == null) continue;
+
+                            var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
+                            newGuess.InputParamName = record["rOut0.TargetName"].ToString();
+
+                            var multiItems = new List<CreateObjectItem>();
+
+                            bool allComponentsExist = true;
+                            for (int i = 0; i < depth - 1; i++)
+                            {
+                                Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
+
+                                var _next_proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(next_expected_guid);
+                                if (_next_proxy == null)
+                                {
+                                    allComponentsExist = false;
+                                    break;
+                                }
+
+                                var nextGuess = new CreateObjectItem(next_expected_guid, 0, "", false);
+                                nextGuess.InputParamName = record[$"rOut{i}.TargetName"].ToString();
+                                nextGuess.OutputParamName = record[$"rOut{i}.SourceName"].ToString();
+                                multiItems.Add(nextGuess);
+                            }
+
+                            if (!allComponentsExist) continue;
+
+                            newGuess.MultiItems = multiItems.ToArray();
+                            guesses.Add(newGuess);
                         }
                     }
                 }
@@ -150,7 +180,38 @@ public static class ComponentTraversal
                         {
                             foreach (var record in records)
                             {
-                                guesses.Add(new Guid(record["next.ComponentGuid"].ToString()));
+                                // Get the component from the GUID to test if it exists
+                                Guid expected_guid = new Guid(record["next0.ComponentGuid"].ToString());
+                                var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
+                                if (_proxy == null) continue;
+
+                                var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
+                                newGuess.InputParamName = record["rOut0.TargetName"].ToString();
+
+                                var multiItems = new List<CreateObjectItem>();
+
+                                bool allComponentsExist = true;
+                                for (int i = 0; i < depth - 1; i++)
+                                {
+                                    Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
+
+                                    var _next_proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(next_expected_guid);
+                                    if (_next_proxy == null)
+                                    {
+                                        allComponentsExist = false;
+                                        break;
+                                    }
+
+                                    var nextGuess = new CreateObjectItem(next_expected_guid, 0, "", false);
+                                    nextGuess.InputParamName = record[$"rOut{i}.TargetName"].ToString();
+                                    nextGuess.OutputParamName = record[$"rOut{i}.SourceName"].ToString();
+                                    multiItems.Add(nextGuess);
+                                }
+
+                                if (!allComponentsExist) continue;
+
+                                newGuess.MultiItems = multiItems.ToArray();
+                                guesses.Add(newGuess);
                             }
                         }
                     }
@@ -163,14 +224,13 @@ public static class ComponentTraversal
         }
     }
 
-    public static List<Guid> GetUpstreamResults(Guid guid, int depth, int outDepth, out List<Guid> visitedGuids)
+    public static CreateObjectItem[] GetUpstreamResults(Guid guid, int depth, int outDepth, out List<Guid> visitedGuids)
     {
-        IGH_DocumentObject startObj = Instances.ActiveCanvas?.Document.FindObject(guid, false);
+        IGH_DocumentObject startObj = Grasshopper.Instances.ActiveCanvas?.Document.FindObject(guid, false);
         if (startObj == null)
         {
-            MessageBox.Show("Object not found in canvas");
             visitedGuids = new List<Guid>();
-            return new List<Guid>();
+            return null;
         }
 
         IDriver driver = GraphDatabase.Driver(
@@ -179,12 +239,12 @@ public static class ComponentTraversal
         );
 
         HashSet<Guid> visited = new HashSet<Guid>();
-        List<Guid> guesses = new List<Guid>();
+        List<CreateObjectItem> guesses = new List<CreateObjectItem>();
         List<string> initialChain = new List<string> { startObj.Name };
         List<string> initialTarget = new List<string>();
         TraverseUpstream(startObj, driver, visited, guesses, initialChain, initialTarget, depth, outDepth);
         visitedGuids = visited.ToList();
-        return guesses;
+        return guesses.ToArray();
     }
 }
 
@@ -401,30 +461,9 @@ public static class GuessFactory
     {
         // Retrieve the queries based on the OriginGUID
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
+        var guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, 2, out List<Guid> visited_guids);
+        //List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
 
-        // Get the Results from Neo4js
-        List<Guid> expected_components = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, 2, out List<Guid> visited_guids);
-
-        CreateObjectItem[] guesses = new CreateObjectItem[expected_components.Count];
-        List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
-        ushort i = 0;
-        foreach (Guid expected_guid in expected_components)
-        {
-            // Get the component from the GUID
-            var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
-            if (_proxy == null)
-            {
-                guesses[i] = new CreateObjectItem(expected_guid, i, "Uninstalled component", false);
-            }
-            else
-            {
-                List<Guid> newList = new List<Guid>(visited_guids);
-                newList.Add(expected_guid);
-
-                guesses[i] = new CreateObjectItem(expected_guid, 0, generated_names[i], false);
-            }
-            i++;
-        }
         return guesses;
     }
 }
