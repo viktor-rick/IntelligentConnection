@@ -25,7 +25,7 @@ namespace QuickConnection;
 
 public static class DynamicCypherBuilder
 {
-    public static string BuildDynamicPattern(List<string> names, List<string> targets, int outDepth)
+    public static string BuildDynamicPattern(List<string> names, List<string> targets, int depth, int outDepth)
     {
         // Example: for names = [ "Name_A", "Name_B", "Name_C" ]
         // the generated query will be:
@@ -45,7 +45,9 @@ public static class DynamicCypherBuilder
         patternBuilder.Append("\nWHERE ");
         for (int i = 0; i < names.Count; i++)
         {
-            patternBuilder.Append($"node{i}.ComponentName = '{names[i]}'");
+            if(i == 0 && depth == 1) patternBuilder.Append($"node{i}");
+            else patternBuilder.Append($"node{i}.ComponentName = '{names[i]}'");
+
             if (i < names.Count - 1)
                 patternBuilder.Append(" AND ");
         }
@@ -53,7 +55,7 @@ public static class DynamicCypherBuilder
 
         string matchOut = $"\nMATCH (node{names.Count - 1})";
         string _return = $"\nRETURN DISTINCT node{names.Count - 1}.ComponentGuid";
-        for (int i = 0; i < outDepth; i++)
+        for (int i = 0; i < outDepth + 1; i++)
         {
             matchOut += $"-[rOut{i}]->(next{i})";
             _return += $",rOut{i}.SourceName,rOut{i}.TargetName, next{i}.ComponentGuid";
@@ -90,10 +92,10 @@ public static class ComponentTraversal
                 };
                 newTargets.AddRange(currentTargets);
 
-                if (newChain.Count == depth)
+                if (depth == 1 || newChain.Count == depth)
                 {
                     // Build and store the dynamic query for the current chain.
-                    string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, outDepth);
+                    string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, depth, outDepth);
 
                     // Run the query asynchronously and then block to get the result.
                     var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
@@ -113,10 +115,10 @@ public static class ComponentTraversal
                             var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
                             newGuess.InputParamName = record["rOut0.TargetName"].ToString();
 
-                            var multiItems = new List<CreateObjectItem>();
+                            var multiItems = new List<CreateObjectItem>() { newGuess };
 
                             bool allComponentsExist = true;
-                            for (int i = 0; i < depth - 1; i++)
+                            for (int i = 1; i < depth; i++)
                             {
                                 Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
 
@@ -167,9 +169,9 @@ public static class ComponentTraversal
                     };
                     newTargets.AddRange(currentTargets);
 
-                    if (newChain.Count == depth)
+                    if (depth == 1 || newChain.Count == depth)
                     {
-                        string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, outDepth);
+                        string query = DynamicCypherBuilder.BuildDynamicPattern(newChain, newTargets, depth, outDepth);
 
                         // Run the query asynchronously and then block to get the result.
                         var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
@@ -189,10 +191,10 @@ public static class ComponentTraversal
                                 var newGuess = new CreateObjectItem(expected_guid, 0, "", false);
                                 newGuess.InputParamName = record["rOut0.TargetName"].ToString();
 
-                                var multiItems = new List<CreateObjectItem>();
+                                var multiItems = new List<CreateObjectItem>() { newGuess };
 
                                 bool allComponentsExist = true;
-                                for (int i = 0; i < depth - 1; i++)
+                                for (int i = 1; i < depth; i++)
                                 {
                                     Guid next_expected_guid = new Guid(record[$"next{i}.ComponentGuid"].ToString());
 
