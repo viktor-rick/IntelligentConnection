@@ -332,7 +332,7 @@ public class LLMNamePredictor
             "{" +
             "\"model\":\"gpt-4.1-mini\"," +
             "\"messages\":[" +
-            "{\"role\":\"system\",\"content\":\"You will receive multiple component-groups. For each group, generate exactly one 5–12 word engaging and motivating description. Return ONLY: { \\\"names\\\": [..] } where order matches the input groups.\"}," +
+            "{\"role\":\"system\",\"content\":\"You will receive multiple component-groups. For each group, generate exactly one 8–15 word engaging, motivating, but real and technical description. Return ONLY: { \\\"names\\\": [..] } where order matches the input groups.\"}," +
             "{\"role\":\"user\",\"content\":\"" + Escape(batchJson) + "\"}" +
             "]" +
             "}";
