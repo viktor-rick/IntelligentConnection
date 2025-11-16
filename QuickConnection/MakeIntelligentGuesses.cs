@@ -51,148 +51,119 @@ public static class DynamicCypherBuilder
 
 public static class ComponentTraversal
 {
-    public static void TraverseUpstream(
-        IGH_DocumentObject obj,
-        HashSet<Guid> visited,
-        List<string> queries,
-        List<string> chain)
+    public static void TraverseUpstream(IGH_DocumentObject obj, IDriver driver, HashSet<Guid> visited, List<Guid> guesses, List<string> currentChain, int depth)
     {
-        if (obj == null)
-        {
+        if (visited.Contains(obj.InstanceGuid))
             return;
-        }
-        if (visited.Contains(obj.ComponentGuid))
-        {
-            return;
-        }
+        visited.Add(obj.InstanceGuid);
 
-        visited.Add(obj.ComponentGuid);
-
+        // Case 1: The object is a parameter (IGH_Param) which may have source connections.
         if (obj is IGH_Param param)
         {
             foreach (IGH_Param source in param.Sources)
             {
-                IGH_DocumentObject up = source.Attributes.GetTopLevel.DocObject;
-                List<string> newChain = new List<string> { up.Name };
-                newChain.AddRange(chain);
+                IGH_DocumentObject upstreamObj = source.Attributes.GetTopLevel.DocObject;
+                List<string> newChain = new List<string>
+                {
+                    upstreamObj.Name
+                };
+                newChain.AddRange(currentChain);
 
-                queries.Add(DynamicCypherBuilder.BuildDynamicPattern(newChain));
-                TraverseUpstream(up, visited, queries, newChain);
+                if (newChain.Count == depth)
+                {
+                    // Build and store the dynamic query for the current chain.
+                    string query = DynamicCypherBuilder.BuildDynamicPattern(newChain);
+
+                    // Run the query asynchronously and then block to get the result.
+                    var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
+
+                    // Retrieve all records returned by this query.
+                    var records = cursor.ToListAsync().GetAwaiter().GetResult();
+
+                    if (records.Count > 0)
+                    {
+                        foreach (var record in records)
+                        {
+                            guesses.Add(new Guid(record["next.ComponentGuid"].ToString()));
+                        }
+                    }
+                }
+                else
+                {
+                    // Continue traversing upstream.
+                    TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, depth);
+                }
             }
         }
+        // Case 2: The object is a component.
         else if (obj is GH_Component comp)
         {
             foreach (IGH_Param p in comp.Params.Input)
             {
                 foreach (IGH_Param source in p.Sources)
                 {
-                    IGH_DocumentObject up = source.Attributes.GetTopLevel.DocObject;
-                    List<string> newChain = new List<string> { up.Name };
-                    newChain.AddRange(chain);
+                    IGH_DocumentObject upstreamObj = source.Attributes.GetTopLevel.DocObject;
+                    List<string> newChain = new List<string>
+                    {
+                        upstreamObj.Name
+                    };
+                    newChain.AddRange(currentChain);
+                    if (newChain.Count == depth)
+                    {
+                        string query = DynamicCypherBuilder.BuildDynamicPattern(newChain);
 
-                    queries.Add(DynamicCypherBuilder.BuildDynamicPattern(newChain));
-                    TraverseUpstream(up, visited, queries, newChain);
+                        // Run the query asynchronously and then block to get the result.
+                        var cursor = driver.AsyncSession().RunAsync(query).GetAwaiter().GetResult();
+
+                        // Retrieve all records returned by this query.
+                        var records = cursor.ToListAsync().GetAwaiter().GetResult();
+
+                        if (records.Count > 0)
+                        {
+                            foreach (var record in records)
+                            {
+                                guesses.Add(new Guid(record["next.ComponentGuid"].ToString()));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, depth);
+                    }
                 }
             }
         }
     }
 
-    public static List<string> GetUpstreamQueries(IGH_DocumentObject obj)
+    public static List<Guid> GetUpstreamResults(Guid guid, int depth, out List<Guid> visitedGuids)
     {
-        HashSet<Guid> visited = new HashSet<Guid>();
-        List<string> queries = new List<string>();
-        List<string> chain = new List<string> { obj.Name };
-
-        TraverseUpstream(obj, visited, queries, chain);
-
-        return queries;
-    }
-}
-
-
-public class GHHelpers
-{
-    public static IGH_DocumentObject GetObjectByGuid(string guidStr)
-    {
-        var doc = Grasshopper.Instances.ActiveCanvas?.Document;
-        if (doc == null)
-        {
-            MessageBox.Show("Doc not found");
-            return null;
-        }
-
-        if (!Guid.TryParse(guidStr, out Guid guid))
-        {
-            MessageBox.Show("Input not a GUID");
-            return null;
-        }
-
-        return doc.FindObject(new Guid(guidStr), false);
-    }
-
-    public List<string> GetQueries(string guidStr)
-    {
-        IGH_DocumentObject obj = GetObjectByGuid(guidStr);
-        if (obj == null)
+        IGH_DocumentObject startObj = Instances.ActiveCanvas?.Document.FindObject(guid, false);
+        if (startObj == null)
         {
             MessageBox.Show("Object not found in canvas");
-            return new List<string>();
+            visitedGuids = new List<Guid>();
+            return new List<Guid>();
         }
-        return ComponentTraversal.GetUpstreamQueries(obj);
-    }
-    public static List<Guid> RunQueries(List<string> queries)
-    {
+
         IDriver driver = GraphDatabase.Driver(
             "neo4j+s://916f7f37.databases.neo4j.io",
             AuthTokens.Basic("neo4j", "_GjWi91K3QZkkGg3hA7Itrp-U9dlvzH80JnFsnvvW6I")
         );
-        try
-        {
-            using (var session = driver.AsyncSession())
-            {
-                List<Guid> output = new List<Guid>();
 
-                foreach (var q in queries)
-                {
-                    var cypherQuery = q.Trim();
-                    var cursor = session.RunAsync(cypherQuery).GetAwaiter().GetResult();
-                    var records = cursor.ToListAsync().GetAwaiter().GetResult();
-                    foreach (var record in records)
-                    {
-                        if (record.Keys.Contains("next.ComponentGuid"))
-                        {
-                            output.Add(new Guid(record["next.ComponentGuid"].ToString()));
-                        }
-                    }
-                }
-
-                return output;
-            }
-        }
-        catch (Exception ex)
-        {
-            // Optionally, throw or return an empty list if there is an error
-            MessageBox.Show("Error: " + ex.Message);
-            return new List<Guid>();
-        }
-        finally
-        {
-            driver.Dispose();
-        }
+        HashSet<Guid> visited = new HashSet<Guid>();
+        List<Guid> guesses = new List<Guid>();
+        List<string> initialChain = new List<string> { startObj.Name };
+        TraverseUpstream(startObj, driver, visited, guesses, initialChain, depth);
+        visitedGuids = visited.ToList();
+        return guesses;
     }
 }
-
-
-    public static class GuessFactory
+public static class GuessFactory
 {
     public static CreateObjectItem[] MakeIntelligentGuesses(Guid OriginGUID)
-    {
-        // Retrieve the queries based on the OriginGUID
-        GHHelpers ghScript = new GHHelpers();
-        List<string> queries = ghScript.GetQueries(OriginGUID.ToString());
-        
+    {   
         // Retrieve the guessed GUIDs from the database
-        List<Guid> expected_components = GHHelpers.RunQueries(queries);
+        List<Guid> expected_components = ComponentTraversal.GetUpstreamResults(OriginGUID,3, out List<Guid> visitedGuids);
 
         CreateObjectItem[] guesses = new CreateObjectItem[expected_components.Count];
         ushort i = 0;
@@ -200,7 +171,7 @@ public class GHHelpers
         {
             // Get the component from the GUID
 
-            IGH_DocumentObject found_component = GHHelpers.GetObjectByGuid(expected_guid.ToString());
+            IGH_DocumentObject found_component = Instances.ActiveCanvas?.Document.FindObject(expected_guid,false);
             var _proxy = Grasshopper.Instances.ComponentServer.EmitObjectProxy(expected_guid);
             if (_proxy == null)
             {
