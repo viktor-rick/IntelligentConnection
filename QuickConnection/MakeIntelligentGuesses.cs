@@ -42,20 +42,26 @@ public static class DynamicCypherBuilder
                 patternBuilder.Append("-[r" + i + " {TargetName:'" + targets[i - 1] + "'}]->");
             patternBuilder.Append($"(node{i})");
         }
-        
-        string whereString = "";
+
+        patternBuilder.Append("\nWHERE ");
+
+        //string whereString = "";
         for (int i = 0; i < names.Count; i++)
         {
+            //if(i == 0 && depth == 1) {}
+            //else whereString+=$"node{i}.ComponentName = '{names[i]}'";
+
+            //if (i < names.Count - 1)
+            //    whereString+=" AND ";
             if(i == 0 && depth == 1) {}
-            else whereString+=$"node{i}.ComponentName = '{names[i]}'";
+            else patternBuilder.Append($"node{i}.ComponentName = '{names[i]}'");
 
             if (i < names.Count - 1)
-                whereString+=" AND ";
+                patternBuilder.Append(" AND ");
         }
-        if (whereString.Length > 0) {
-            patternBuilder.Append("\nWHERE ");
-            patternBuilder.Append(whereString);
-        }
+        //if (whereString.Length > 0) {   
+        //    patternBuilder.Append(whereString);
+        //}
         patternBuilder.Append($"\nWITH node{names.Count - 1}");
 
         string matchOut = $"\nMATCH (node{names.Count - 1})";
@@ -161,6 +167,7 @@ public static class ComponentTraversal
         {
             foreach (IGH_Param p in comp.Params.Input)
             {
+                /*
                 if (p.SourceCount == 0)
                 {
                     string query = DynamicCypherBuilder.BuildDynamicPattern(currentChain, currentTargets, currentChain.Count, outDepth);
@@ -218,6 +225,7 @@ public static class ComponentTraversal
                 }
                 else
                 {
+                */
                     foreach (IGH_Param source in p.Sources)
                     {
                         IGH_DocumentObject upstreamObj = source.Attributes.GetTopLevel.DocObject;
@@ -289,7 +297,7 @@ public static class ComponentTraversal
                             TraverseUpstream(upstreamObj, driver, visited, guesses, newChain, newTargets, depth, outDepth);
                         }
                     }
-                }
+                //}
             }
         }
     }
@@ -531,10 +539,10 @@ public static class GuessFactory
     public static CreateObjectItem[] MakeIntelligentGuesses(Guid OriginGUID, int trace, int predict)
     {
         // Retrieve the queries based on the OriginGUID
-        LLMNamePredictor LLMHelper = new LLMNamePredictor();
+        //LLMNamePredictor LLMHelper = new LLMNamePredictor();
 
         CreateObjectItem[] guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, trace, predict, out List<Guid> visited_guids);
-
+        /*
         string API_KEY = "";
 
         List<string> generated_names = LLMHelper.GenerateBatchText(API_KEY, guesses, visited_guids);
@@ -548,6 +556,7 @@ public static class GuessFactory
                 guess.InitString = generated_name;
             }
         }
+        */
         return guesses;
     }
 }
