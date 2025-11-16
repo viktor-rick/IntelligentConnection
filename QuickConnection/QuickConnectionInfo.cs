@@ -60,6 +60,12 @@ partial class SimpleAssemblyPriority
     [Setting]
     private static readonly double _quickConnectionWindowHeight = 200;
 
+    [Setting, Config("Last Trace Depth")]
+    internal static int LastTraceDepth = 2;
+
+    [Setting, Config("Last Predict Depth")]
+    internal static int LastPredictDepth = 2;
+
     [Config("Set Core Only Library", "Click to set the quick connection library to all core document objects.", section:2)]
     public static object CoreLib
     {

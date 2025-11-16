@@ -122,6 +122,9 @@ public partial class ChooseWindow : Window
 
         InitializeComponent();
 
+        IntA.TextChanged += OnTracePredictUpdated;
+        IntB.TextChanged += OnTracePredictUpdated;
+
         if (!dict.TryGetValue(guid, out CreateObjectItem[] objItems)) objItems = [];
         Image objImage = CreateHeader(param.Icon_24x24);
         ObjectTitle.MouseDoubleClick += (sender, e) =>
@@ -137,11 +140,14 @@ public partial class ChooseWindow : Window
 
 
         // SMART CHOICES 
+        IntA.Text = SimpleAssemblyPriority.LastTraceDepth.ToString();
+        IntB.Text = SimpleAssemblyPriority.LastPredictDepth.ToString();
+
         int trace = int.TryParse(IntA.Text, out var t) ? t : 2;
         int predict = int.TryParse(IntB.Text, out var p) ? p : 2;
 
         CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid, trace, predict);
-        
+
         var uri = new Uri("pack://application:,,,/QuickConnection;component/Resources/brain.png", UriKind.Absolute);
 
         Image brainImage = new Image
@@ -160,8 +166,12 @@ public partial class ChooseWindow : Window
         {
             Menu_EditItemRightClicked(objItems, param.ComponentGuid, param, isInput);
         };
+        
         BrainTitle.Header = brainImage;
         BrainList.ItemsSource = brainItems;
+
+        IntA.TextChanged += OnTracePredictUpdated;
+        IntB.TextChanged += OnTracePredictUpdated;
 
         //Tree List Tree Quick Connect
         if (!isInput)
@@ -390,6 +400,27 @@ public partial class ChooseWindow : Window
         // DEFAULT BEHAVIOR FOR EVERYTHING ELSE
         cItem.CreateObject(_owner, _position);
         this.Close();
+    }
+    private void OnTracePredictUpdated(object sender, RoutedEventArgs e)
+    {
+        int trace = int.TryParse(IntA.Text, out var t) ? t : 2;
+        int predict = int.TryParse(IntB.Text, out var p) ? p : 2;
+
+        // Save globally so next time they load
+        SimpleAssemblyPriority.LastTraceDepth = trace;
+        SimpleAssemblyPriority.LastPredictDepth = predict;
+        SimpleAssemblyPriority.SaveToJson();
+
+        Console.WriteLine($"Updated Trace={trace}, Predict={predict}");
+
+        // Refresh smart suggestions
+        CreateObjectItem[] brainItems =
+            GuessFactory.MakeIntelligentGuesses(
+                _owner.Attributes.GetTopLevel.DocObject.InstanceGuid,
+                trace,
+                predict);
+
+        BrainList.ItemsSource = brainItems;
     }
 }
 /// <summary>

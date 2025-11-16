@@ -149,8 +149,7 @@
                        Width="40"
                        VerticalAlignment="Center"/>
                     <TextBox x:Name="IntA"
-                     Width="50"
-                     Text="2"/>
+                     Width="50"/>
                 </StackPanel>
 
                 <!-- B input -->
@@ -159,14 +158,18 @@
                        Width="50"
                        VerticalAlignment="Center"/>
                     <TextBox x:Name="IntB"
-                     Width="40"
-                     Text="2"/>
+                     Width="40"/>
                 </StackPanel>
+
+                <Button Content="Update"
+                        Width="70"
+                        Margin="0,6,0,0"
+                        Click="OnTracePredictUpdated"/>
 
             </StackPanel>
         </Border>
 
-        <!-- 🔼 TOP: Tabs -->
+        <!-- TOP: Tabs -->
         <TabControl>
             <TabItem x:Name="BrainTitle">
                 <ListBox x:Name="BrainList" SelectionChanged="SelectionChanged"/>

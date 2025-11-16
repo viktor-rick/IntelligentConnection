@@ -467,6 +467,7 @@ public static class GuessFactory
     {
         // Retrieve the queries based on the OriginGUID
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
+
         CreateObjectItem[] guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, trace, predict, out List<Guid> visited_guids);
         List<string> generated_names = LLMHelper.GenerateBatchText("", guesses, visited_guids);
 
