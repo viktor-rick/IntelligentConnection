@@ -6,6 +6,7 @@ using Neo4j.Driver;
 using Rhino;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -179,7 +180,12 @@ public static class GuessFactory
             }
             else
             {
-                guesses[i] = new CreateObjectItem(expected_guid, i, _proxy.Desc.Name, false);
+                List<string> newList = new List<string>(chains);
+                newList.Add(_proxy.Desc.Name);
+
+                string generated_name = LLMHelper.GenerateText("", newList);
+
+                guesses[i] = new CreateObjectItem(expected_guid, i, generated_name, false);
             }
             i++;
         }
