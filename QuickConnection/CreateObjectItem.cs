@@ -13,6 +13,8 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
     public readonly static MethodInfo functions = typeof(GH_Canvas).GetRuntimeMethods().Where(m => m.Name.Contains("InstantiateNewObject") && !m.IsPublic).First();
 
     public ushort Index { get; }
+    public string InputParamName { get; set; }
+    public string OutputParamName { get; set; }
     public Guid ObjectGuid { get; }
     public string InitString { get; set; }
     public Bitmap Icon { get; } = null;
@@ -111,21 +113,41 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
 
         if (obj is IGH_Component)
         {
-            IGH_Component com = obj as IGH_Component;
+            IGH_Component com = (IGH_Component)obj;
             AddAObjectToCanvas(obj, objCenter, InitString);
 
+            // ---------- NEW INDEX / NAME-BASED LOOKUP ----------
+            string chosenName = null;
+
             if (IsInput)
+                chosenName = OutputParamName;
+            else
+                chosenName = InputParamName;
+
+            int idx;
+
+            if (!string.IsNullOrEmpty(chosenName))
             {
-                param.AddSource(com.Params.Output[Index]);
+                idx = FindParamIndex(com, chosenName, IsInput);
             }
             else
             {
-                com.Params.Input[Index].AddSource(param);
+                idx = Index;
+            }
+            // ----------------------------------------------------
+
+            if (IsInput)
+            {
+                param.AddSource(com.Params.Output[idx]);
+            }
+            else
+            {
+                com.Params.Input[idx].AddSource(param);
             }
 
             Grasshopper.Instances.ActiveCanvas.Document.NewSolution(false);
         }
-        else if(obj is IGH_Param)
+        else if (obj is IGH_Param)
         {
             IGH_Param par = obj as IGH_Param;
             AddAObjectToCanvas(obj, objCenter, InitString);
@@ -143,6 +165,28 @@ public class CreateObjectItem : IComparable<CreateObjectItem>
         }
 
         return obj;
+    }
+
+    private static int FindParamIndex(IGH_Component comp, string paramName, bool isInput)
+    {
+        if (comp == null)
+            throw new ArgumentNullException(nameof(comp));
+
+        // choose input or output list
+        var list = isInput ? comp.Params.Output : comp.Params.Input;
+
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (string.Equals(list[i].Name, paramName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(list[i].NickName, paramName, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        throw new ArgumentException(
+            $"Parameter '{paramName}' not found on component '{comp.Name}' " +
+            $"({(isInput ? "output" : "input")} params).");
     }
 
     public static void AddAObjectToCanvas(IGH_DocumentObject obj, PointF pivot, string init, bool update = false)

@@ -140,22 +140,71 @@ public partial class ChooseWindow : Window
         //CreateObjectItem[] brainItems = GuessFactory.MakeIntelligentGuesses(componentguid);
         CreateObjectItem[] brainItems =
         {
-            new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false)
+            new CreateObjectItem(
+            // -------------------------------------------------------------
+            // FIRST BRAIN ITEM
+            // -------------------------------------------------------------
+                new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+                0, "", false)
             {
+                InputParamName = "A", 
+                OutputParamName = "Volume", 
+
                 MultiItems = new[]
                 {
-                    new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false),
-                    new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false),
-                    new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 0, "", false)
+                    new CreateObjectItem(
+                        new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+                        0, "", false)
+                    {
+                        InputParamName = "A",
+                        OutputParamName = "Result"
+                    },
+
+                    new CreateObjectItem(
+                        new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+                        0, "", false)
+                    {
+                        InputParamName = "B",
+                        OutputParamName = "Result"
+                    },
+
+                    new CreateObjectItem(
+                        new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
+                        0, "", false)
+                    {
+                        InputParamName = "B",
+                        OutputParamName = "Result"
+                    }
                 }
             },
 
-            new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 0, "", false)
+            // -------------------------------------------------------------
+            // SECOND BRAIN ITEM
+            // -------------------------------------------------------------
+            new CreateObjectItem(
+                new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
+                0, "", false)
             {
+                InputParamName = "Area",
+                OutputParamName = "B",
+
                 MultiItems = new[]
                 {
-                    new CreateObjectItem(new Guid("a0d62394-a118-422d-abb3-6af115c75b25"), 0, "", false),
-                    new CreateObjectItem(new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"), 0, "", false)
+                    new CreateObjectItem(
+                        new Guid("a0d62394-a118-422d-abb3-6af115c75b25"),
+                        0, "", false)
+                    {
+                        InputParamName = "A",
+                        OutputParamName = "Result"
+                    },
+
+                    new CreateObjectItem(
+                        new Guid("ce46b74e-00c9-43c4-805a-193b69ea4a11"),
+                        0, "", false)
+                    {
+                        InputParamName = "B",
+                        OutputParamName = "Result"
+                    }
                 }
             }
         };
