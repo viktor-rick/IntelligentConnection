@@ -10,6 +10,7 @@ using Rhino;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -457,11 +458,11 @@ public class LLMNamePredictor
 
 public static class GuessFactory
 {
-    public static CreateObjectItem[] MakeIntelligentGuesses(Guid OriginGUID)
+    public static CreateObjectItem[] MakeIntelligentGuesses(Guid OriginGUID, int trace, int predict)
     {
         // Retrieve the queries based on the OriginGUID
         LLMNamePredictor LLMHelper = new LLMNamePredictor();
-        var guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, 2, 2, out List<Guid> visited_guids);
+        var guesses = ComponentTraversal.GetUpstreamResults(OriginGUID, trace, predict, out List<Guid> visited_guids);
         //List<string> generated_names = LLMHelper.GenerateBatchText("", expected_components, visited_guids);
 
         return guesses;
